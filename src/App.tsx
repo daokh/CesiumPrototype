@@ -181,6 +181,26 @@ function App() {
 	// return () => viewer.destroy();
 	// }, []);
 
+	const getHeading = (
+		from: Cesium.Cartesian3,
+		to: Cesium.Cartesian3
+	) => {
+		const fromCarto = Cesium.Cartographic.fromCartesian(from);
+		const toCarto = Cesium.Cartographic.fromCartesian(to);
+
+		const lon1 = fromCarto.longitude;
+		const lat1 = fromCarto.latitude;
+		const lon2 = toCarto.longitude;
+		const lat2 = toCarto.latitude;
+
+		const y = Math.sin(lon2 - lon1) * Math.cos(lat2);
+		const x =
+			Math.cos(lat1) * Math.sin(lat2) -
+			Math.sin(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1);
+
+		return Math.atan2(y, x);
+	};
+
 	//Create Aircraft
 	const createAircraft = () => {
 		const viewer = viewerRef.current;
@@ -237,43 +257,59 @@ function App() {
 		animationStartedRef.current = true;
 
 		viewer.clock.onTick.addEventListener(() => {
-			if (!aircraftRef.current) return;
-			if (routeRef.current.length < 2) return;
 
-			const start = routeRef.current[currentLegRef.current];
-			const end = routeRef.current[currentLegRef.current + 1];
+			viewer.clock.onTick.addEventListener(() => {
+				if (!aircraftRef.current) return;
+				if (routeRef.current.length < 2) return;
 
-			progressRef.current += 0.005;
+				progressRef.current += 0.0005;
 
-			if (progressRef.current >= 1) {
-				progressRef.current = 0;
-				currentLegRef.current++;
+				if (progressRef.current >= 1) {
+					progressRef.current = 0;
+					currentLegRef.current++;
 
-				if (currentLegRef.current >= routeRef.current.length - 1) {
-					currentLegRef.current = 0;
+					if (currentLegRef.current >= routeRef.current.length - 1) {
+						currentLegRef.current = 0;
+					}
 				}
-			}
 
-			const pos = Cesium.Cartesian3.lerp(
-				start,
-				end,
-				progressRef.current,
-				new Cesium.Cartesian3()
-			);
+				const start = routeRef.current[currentLegRef.current];
+				const end = routeRef.current[currentLegRef.current + 1];
 
-			// Raise aircraft 1000 meters above ground
-			const cartographic = Cesium.Cartographic.fromCartesian(pos);
+				if (!start || !end) return;
 
-			cartographic.height = 1000;
+				const pos = Cesium.Cartesian3.lerp(
+					start,
+					end,
+					progressRef.current,
+					new Cesium.Cartesian3()
+				);
 
-			const raisedPos = Cesium.Cartesian3.fromRadians(
-				cartographic.longitude,
-				cartographic.latitude,
-				cartographic.height
-			);
+				const cartographic = Cesium.Cartographic.fromCartesian(pos);
+				cartographic.height = 1000;
 
-			aircraftRef.current.position =
-				new Cesium.ConstantPositionProperty(raisedPos);
+				const raisedPos = Cesium.Cartesian3.fromRadians(
+					cartographic.longitude,
+					cartographic.latitude,
+					cartographic.height
+				);
+
+				aircraftRef.current.position =
+					new Cesium.ConstantPositionProperty(raisedPos);
+
+				//Calculate the heading
+				const heading = getHeading(start, end) + Cesium.Math.toRadians(270);
+
+				aircraftRef.current.orientation =
+					Cesium.Transforms.headingPitchRollQuaternion(
+						raisedPos,
+						new Cesium.HeadingPitchRoll(
+							heading,
+							0,
+							0
+						)
+					);
+			});
 		});
 	};
 
