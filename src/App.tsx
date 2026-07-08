@@ -18,6 +18,14 @@ function App() {
 	const drawingPoints = useRef<Cesium.Cartesian3[]>([]);
 	const drawingEntity = useRef<Cesium.Entity | null>(null);
 
+	//Variables for animation
+	const aircraftRef = useRef<Cesium.Entity | null>(null);
+	const routeRef = useRef<Cesium.Cartesian3[]>([]);
+	const currentLegRef = useRef(0);
+	const progressRef = useRef(0);
+	const animationStartedRef = useRef(false);
+
+
 	useEffect(() => {
 		Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJmZmU2MzViYS05MzliLTQxZTQtYmU3MS0wYjY2NmM3YTllMTUiLCJpZCI6NDUzMTM5LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODMzNTk5NjN9.ZwbfaPF3Bfk3dOiQyKtN4kWtiZOvllEOBB4A7vvwDhI";
 
@@ -116,6 +124,7 @@ function App() {
 			// Close the polygon
 			finishedPoints.push(finishedPoints[0]);
 
+
 			// Remove the temporary drawing polygon
 			if (drawingEntity.current) {
 				viewer.entities.remove(drawingEntity.current);
@@ -134,6 +143,14 @@ function App() {
 					material: Cesium.Color.YELLOW,
 				},
 			});
+
+
+			routeRef.current = finishedPoints;
+			currentLegRef.current = 0;
+			progressRef.current = 0;
+
+			createAircraft();
+			startAircraftAnimation();
 
 			// Ready for the next polygon
 			drawingEntity.current = null;
@@ -164,7 +181,101 @@ function App() {
 	// return () => viewer.destroy();
 	// }, []);
 
+	//Create Aircraft
+	const createAircraft = () => {
+		const viewer = viewerRef.current;
+		if (!viewer) return;
+		if (routeRef.current.length < 2) return;
 
+		if (aircraftRef.current) {
+			viewer.entities.remove(aircraftRef.current);
+		}
+
+
+		console.log("---> Aircraft");
+
+		// aircraftRef.current = viewer.entities.add({
+		// 	position: routeRef.current[0],
+		// 	model: {
+		// 		uri: "/Cesium_Air.glb",
+		// 		minimumPixelSize: 64,
+		// 		maximumScale: 200,
+		// 	},
+		// });
+
+
+
+		aircraftRef.current = viewer.entities.add({
+			position: routeRef.current[0],
+
+			model: {
+				uri: "/Cesium_Air.glb",
+				minimumPixelSize: 256,
+				maximumScale: 10000,
+				scale: 50,
+			}
+		});
+
+		console.log("Aircraft entity created");
+
+		//Red point only testing
+		// aircraftRef.current = viewer.entities.add({
+		// 	position: routeRef.current[0],
+		// 	point: {
+		// 		pixelSize: 18,
+		// 		color: Cesium.Color.RED,
+		// 	},
+		// });
+	};
+
+	//Aircraft Animation
+	const startAircraftAnimation = () => {
+		const viewer = viewerRef.current;
+		if (!viewer) return;
+		if (animationStartedRef.current) return;
+
+		animationStartedRef.current = true;
+
+		viewer.clock.onTick.addEventListener(() => {
+			if (!aircraftRef.current) return;
+			if (routeRef.current.length < 2) return;
+
+			const start = routeRef.current[currentLegRef.current];
+			const end = routeRef.current[currentLegRef.current + 1];
+
+			progressRef.current += 0.005;
+
+			if (progressRef.current >= 1) {
+				progressRef.current = 0;
+				currentLegRef.current++;
+
+				if (currentLegRef.current >= routeRef.current.length - 1) {
+					currentLegRef.current = 0;
+				}
+			}
+
+			const pos = Cesium.Cartesian3.lerp(
+				start,
+				end,
+				progressRef.current,
+				new Cesium.Cartesian3()
+			);
+
+			// Raise aircraft 1000 meters above ground
+			const cartographic = Cesium.Cartographic.fromCartesian(pos);
+
+			cartographic.height = 1000;
+
+			const raisedPos = Cesium.Cartesian3.fromRadians(
+				cartographic.longitude,
+				cartographic.latitude,
+				cartographic.height
+			);
+
+			aircraftRef.current.position =
+				new Cesium.ConstantPositionProperty(raisedPos);
+		});
+	};
 
 	const switchMap = (type: "bing" | "osm" | "esri" | "topo" | "dark") => {
 		const viewer = viewerRef.current;
