@@ -25,6 +25,15 @@ function App() {
 	const progressRef = useRef(0);
 	const animationStartedRef = useRef(false);
 
+	//Play controller
+	const [isPlaying, setIsPlaying] = useState(false);
+	const [speed, setSpeed] = useState(0.0005);
+
+	const isPlayingRef = useRef(false);
+	const speedRef = useRef(0.0005);
+
+	const [aircraftHeight, setAircraftHeight] = useState(1000);
+	const aircraftHeightRef = useRef(1000);
 
 	useEffect(() => {
 		Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJmZmU2MzViYS05MzliLTQxZTQtYmU3MS0wYjY2NmM3YTllMTUiLCJpZCI6NDUzMTM5LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODMzNTk5NjN9.ZwbfaPF3Bfk3dOiQyKtN4kWtiZOvllEOBB4A7vvwDhI";
@@ -105,10 +114,6 @@ function App() {
 			Cesium.ScreenSpaceEventType.LEFT_CLICK
 		);
 
-
-
-
-
 		/* Set handler for the mouse double click */
 		handler.setInputAction(() => {
 
@@ -151,7 +156,6 @@ function App() {
 
 			createAircraft();
 			startAircraftAnimation();
-
 			// Ready for the next polygon
 			drawingEntity.current = null;
 			drawingPoints.current = [];
@@ -166,9 +170,6 @@ function App() {
 		};
 
 	}, []);
-
-
-
 
 	/** Simple Cesium */
 	// useEffect(() => {
@@ -201,6 +202,27 @@ function App() {
 		return Math.atan2(y, x);
 	};
 
+	const playFlight = () => {
+		isPlayingRef.current = true;
+		setIsPlaying(true);
+	};
+
+	const pauseFlight = () => {
+
+		isPlayingRef.current = false;
+		setIsPlaying(false);
+	};
+	const changeSpeed = (newSpeed: number) => {
+		speedRef.current = newSpeed;
+		setSpeed(newSpeed);
+	};
+	const changeAircraftHeight = (newHeight: number) => {
+		aircraftHeightRef.current = newHeight;
+		setAircraftHeight(newHeight);
+		console.log(newHeight);
+
+	};
+
 	//Create Aircraft
 	const createAircraft = () => {
 		const viewer = viewerRef.current;
@@ -210,10 +232,6 @@ function App() {
 		if (aircraftRef.current) {
 			viewer.entities.remove(aircraftRef.current);
 		}
-
-
-		console.log("---> Aircraft");
-
 		// aircraftRef.current = viewer.entities.add({
 		// 	position: routeRef.current[0],
 		// 	model: {
@@ -222,9 +240,6 @@ function App() {
 		// 		maximumScale: 200,
 		// 	},
 		// });
-
-
-
 		aircraftRef.current = viewer.entities.add({
 			position: routeRef.current[0],
 
@@ -235,9 +250,6 @@ function App() {
 				scale: 50,
 			}
 		});
-
-		console.log("Aircraft entity created");
-
 		//Red point only testing
 		// aircraftRef.current = viewer.entities.add({
 		// 	position: routeRef.current[0],
@@ -257,60 +269,64 @@ function App() {
 		animationStartedRef.current = true;
 
 		viewer.clock.onTick.addEventListener(() => {
+			console.log("tick");
+			if (!aircraftRef.current) return;
+			if (routeRef.current.length < 2) return;
 
-			viewer.clock.onTick.addEventListener(() => {
-				if (!aircraftRef.current) return;
-				if (routeRef.current.length < 2) return;
+			if (!isPlayingRef.current) return;
 
-				progressRef.current += 0.0005;
+			progressRef.current += speedRef.current;
 
-				if (progressRef.current >= 1) {
-					progressRef.current = 0;
-					currentLegRef.current++;
+			if (progressRef.current >= 1) {
+				progressRef.current = 0;
+				currentLegRef.current++;
 
-					if (currentLegRef.current >= routeRef.current.length - 1) {
-						currentLegRef.current = 0;
-					}
+				if (currentLegRef.current >= routeRef.current.length - 1) {
+					currentLegRef.current = 0;
 				}
+			}
 
-				const start = routeRef.current[currentLegRef.current];
-				const end = routeRef.current[currentLegRef.current + 1];
+			const start = routeRef.current[currentLegRef.current];
+			const end = routeRef.current[currentLegRef.current + 1];
 
-				if (!start || !end) return;
+			if (!start || !end) return;
 
-				const pos = Cesium.Cartesian3.lerp(
-					start,
-					end,
-					progressRef.current,
-					new Cesium.Cartesian3()
+			const pos = Cesium.Cartesian3.lerp(
+				start,
+				end,
+				progressRef.current,
+				new Cesium.Cartesian3()
+			);
+
+			const cartographic = Cesium.Cartographic.fromCartesian(pos);
+
+			cartographic.height = aircraftHeightRef.current
+			console.log("Aircraft height:", cartographic.height);
+			//Calculate the heading
+			const heading = getHeading(start, end) + Cesium.Math.toRadians(270);
+
+			const raisedPos = Cesium.Cartesian3.fromRadians(
+				cartographic.longitude,
+				cartographic.latitude,
+				cartographic.height
+			);
+
+			aircraftRef.current.position =
+				new Cesium.ConstantPositionProperty(raisedPos);
+
+
+
+			aircraftRef.current.orientation =
+				Cesium.Transforms.headingPitchRollQuaternion(
+					raisedPos,
+					new Cesium.HeadingPitchRoll(
+						heading,
+						0,
+						0
+					)
 				);
-
-				const cartographic = Cesium.Cartographic.fromCartesian(pos);
-				cartographic.height = 1000;
-
-				const raisedPos = Cesium.Cartesian3.fromRadians(
-					cartographic.longitude,
-					cartographic.latitude,
-					cartographic.height
-				);
-
-				aircraftRef.current.position =
-					new Cesium.ConstantPositionProperty(raisedPos);
-
-				//Calculate the heading
-				const heading = getHeading(start, end) + Cesium.Math.toRadians(270);
-
-				aircraftRef.current.orientation =
-					Cesium.Transforms.headingPitchRollQuaternion(
-						raisedPos,
-						new Cesium.HeadingPitchRoll(
-							heading,
-							0,
-							0
-						)
-					);
-			});
 		});
+
 	};
 
 	const switchMap = (type: "bing" | "osm" | "esri" | "topo" | "dark") => {
@@ -419,6 +435,8 @@ function App() {
 
 			</div>
 
+
+			{/* Side Div */}
 			<div
 				style={{
 					position: "absolute",
@@ -463,9 +481,43 @@ function App() {
 				<button onClick={() => flyToCity("MiddleEast")}>
 					ME Middle East
 				</button>
+				<hr />
+
+				<div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+					<button onClick={playFlight}>▶ Play</button>
+					<button onClick={pauseFlight}>⏸ Pause</button>
+
+					<label>
+						Speed: {speed}
+					</label>
+
+					<input
+						type="range"
+						min="0.0001"
+						max="0.003"
+						step="0.0001"
+						value={speed}
+						onChange={(e) => changeSpeed(Number(e.target.value))}
+					/>
+				</div>
+
+				<label>
+					Height: {aircraftHeight} m
+				</label>
+
+				<input
+					type="range"
+					min="100"
+					max="100000"
+					step="100"
+					value={aircraftHeight}
+					onChange={(e) => changeAircraftHeight(Number(e.target.value))}
+				/>
 			</div>
 
 
+
+			{/* Bottom Div */}
 			<div
 				style={{
 					position: "absolute",
@@ -491,6 +543,10 @@ function App() {
 					</tbody>
 				</table>
 			</div>
+
+
+
+
 		</>
 	);
 }
