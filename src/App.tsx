@@ -6,6 +6,7 @@ import * as Cesium from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 
 import './App.css'
+import { getTracks } from "./api/trackAPI";
 
 function App() {
 	const [count, setCount] = useState(0)
@@ -163,11 +164,29 @@ function App() {
 		}, Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
 
 
+
+		//Load tracks
+		async function loadTracks() {
+			try {
+				const tracks = await getTracks();
+
+				//console.log("Tracks received in App.tsx:", tracks);
+			} catch (error) {
+				console.error("Unable to load tracks:", error);
+			}
+		}
+
+		loadTracks();
+
 		return () => {
 			viewerRef.current?.destroy();
 			viewerRef.current = null;
 			viewerRef.current = null;
 		};
+
+
+
+
 
 	}, []);
 
@@ -467,7 +486,7 @@ function App() {
 				</select>
 
 				<hr />
-
+				<h4 style={{ margin: "8px 0" }}>BIB Related Functionalities</h4><hr />
 				<h4 style={{ margin: "8px 0" }}>Fly To</h4>
 
 				<button onClick={() => flyToCity("sandiego")}>
@@ -479,10 +498,10 @@ function App() {
 				</button>
 
 				<button onClick={() => flyToCity("MiddleEast")}>
-					ME Middle East
+					ᴍᴇ Middle East
 				</button>
 				<hr />
-
+				<h4 style={{ margin: "8px 0" }}>Flight the route</h4><hr />
 				<div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
 					<button onClick={playFlight}>▶ Play</button>
 					<button onClick={pauseFlight}>⏸ Pause</button>
