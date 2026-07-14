@@ -1,16 +1,30 @@
 import { useState, useEffect, useRef } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
+
 import * as Cesium from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 
-import './App.css'
+import { Viewer } from "cesium";
+
+import {
+	addTracksToCesium,
+	removeTracksFromCesium,
+} from "./cesium/trackOverlay";
+
 import { getTracks } from "./api/trackAPI";
+
+import './App.css'
+
+
+
+
 
 function App() {
 	const [count, setCount] = useState(0)
+
+	// Create viewer
 	const viewerRef = useRef<Cesium.Viewer | null>(null);
+
+
 	const [mousePosition, setMousePosition] = useState({
 		lat: 0,
 		lon: 0,
@@ -35,6 +49,9 @@ function App() {
 
 	const [aircraftHeight, setAircraftHeight] = useState(1000);
 	const aircraftHeightRef = useRef(1000);
+
+	const [tracks, setTracks] = useState<Track[]>([]);
+	const [tracksVisible, setTracksVisible] = useState(false);
 
 	useEffect(() => {
 		Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJmZmU2MzViYS05MzliLTQxZTQtYmU3MS0wYjY2NmM3YTllMTUiLCJpZCI6NDUzMTM5LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODMzNTk5NjN9.ZwbfaPF3Bfk3dOiQyKtN4kWtiZOvllEOBB4A7vvwDhI";
@@ -167,10 +184,19 @@ function App() {
 
 		//Load tracks
 		async function loadTracks() {
+			const viewer = viewerRef.current;
+
+			if (!viewer || viewer.isDestroyed()) {
+				console.error("Viewer has not been created or was destroyed.");
+				return;
+			}
+
 			try {
-				const tracks = await getTracks();
+				const loadedTracks = await getTracks();
 
 				//console.log("Tracks received in App.tsx:", tracks);
+				//addTracksToCesium(viewer, tracks);
+				setTracks(loadedTracks);
 			} catch (error) {
 				console.error("Unable to load tracks:", error);
 			}
@@ -436,6 +462,29 @@ function App() {
 		}
 	};
 
+	function showTracks() {
+		const viewer = viewerRef.current;
+
+		if (!viewer || viewer.isDestroyed()) {
+			console.error("Cesium Viewer is not available.");
+			return;
+		}
+
+		addTracksToCesium(viewer, tracks);
+		setTracksVisible(true);
+	}
+
+	function hideTracks() {
+		const viewer = viewerRef.current;
+
+		if (!viewer || viewer.isDestroyed()) {
+			console.error("Cesium Viewer is not available.");
+			return;
+		}
+
+		removeTracksFromCesium(viewer);
+		setTracksVisible(false);
+	}
 
 	return (
 		<>
@@ -473,12 +522,14 @@ function App() {
 				</label>
 
 				<select
+					defaultValue="bing"
 					onChange={(e) =>
 						switchMap(
 							e.target.value as "osm" | "esri" | "topo" | "dark"
 						)
 					}
 				>
+					<option value="bing">🛰 Bing Maps</option>
 					<option value="osm">🗺 OpenStreetMap</option>
 					<option value="esri">🛰 ESRI Satellite</option>
 					<option value="topo">⛰ OpenTopoMap</option>
@@ -532,6 +583,23 @@ function App() {
 					value={aircraftHeight}
 					onChange={(e) => changeAircraftHeight(Number(e.target.value))}
 				/>
+				<hr />
+
+				<div>
+					<button
+						onClick={showTracks}
+						disabled={tracksVisible || tracks.length === 0}
+					>
+						Show Tracks
+					</button>
+
+					<button
+						onClick={hideTracks}
+						disabled={!tracksVisible}
+					>
+						Hide Tracks
+					</button>
+				</div>
 			</div>
 
 
